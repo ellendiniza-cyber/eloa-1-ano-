@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Eloá 1 Ano - Moldura Interativa</title>
+  <style>
+    :root {
+      --primary: #5b8c5a;
+      --primary-dark: #3e633d;
+      --accent: #d87070;
+      --bg: #f5f7f2;
+      --card-bg: #ffffff;
+      --text: #2d3748;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      color: var(--primary-dark);
+      margin-bottom: 4px;
+    }
+
+    p.subtitle {
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    .main-container {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ÁREA DA MOLDURA E CÂMERA */
+    .viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 9 / 16;
+      background-color: #000;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      touch-action: none;
+    }
+
+    #bg-video, #bg-image {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 100%;
+      min-height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      transition: transform 0.05s ease-out;
+    }
+
+    #bg-video.flipped {
+      transform: translate(-50%, -50%) scaleX(-1);
+    }
+
+    /* MOLDURA POR CIMA DE TUDO */
+    #frame-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .recording-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(220, 38, 38, 0.9);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      z-index: 3;
+    }
+
+    .recording-dot {
+      width: 8px;
+      height: 8px;
+      background: white;
+      border-radius: 50%;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* CONTROLES E BOTÕES */
+    .controls {
+      width: 100%;
+      background: var(--card-bg);
+      padding: 12px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:active {
+      background-color: var(--primary-dark);
+    }
+
+    .btn-accent {
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-secondary {
+      background-color: #edf2f7;
+      color: #4a5568;
+    }
+
+    .zoom-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    .zoom-control input {
+      flex: 1;
+    }
+
+    /* MODAL DE PRÉVIA */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-content {
+      max-width: 100%;
+      max-height: 70vh;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .modal-content img, .modal-content video {
+      width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>1º Aninho da Eloá 🌿</h1>
+    <p class="subtitle">Tire uma foto ou grave um vídeo com a moldura!</p>
+  </header>
+
+  <div class="main-container">
+    <div class="viewport" id="viewport">
+      <div class="recording-badge" id="recBadge">
+        <div class="recording-dot"></div> REC <span id="recTimer">00:00</span>
+      </div>
+      
+      <video id="bg-video" autoplay playsinline muted class="flipped"></video>
+      <img id="bg-image" class="hidden" alt="Mídia">
+      <canvas id="frame-canvas"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="zoom-control">
+        <span>🔍 Zoom:</span>
+        <input type="range" id="zoomRange" min="1" max="3" step="0.1" value="1">
+      </div>
+
+      <div class="btn-grid">
+        <button class="btn btn-secondary" id="btnFlip">🔄 Inverter Câmera</button>
+        <label class="btn btn-secondary">
+          📁 Galeria
+          <input type="file" id="fileInput" accept="image/*,video/*" style="display:none">
+        </label>
+        <button class="btn btn-primary" id="btnPhoto">📸 Tirar Foto</button>
+        <button class="btn btn-accent" id="btnVideo">🎥 Gravar Vídeo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE PRÉ-VISUALIZAÇÃO DA FOTO/VÍDEO COM A MOLDURA -->
+  <div class="modal" id="previewModal">
+    <div class="modal-content" id="modalMediaContainer"></div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn btn-secondary" id="btnClosePreview">❌ Fechar</button>
+      <a class="btn btn-primary" id="btnDownload" download="eloa-1-ano-lembranca">⬇️ Salvar</a>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('bg-video');
+    const bgImage = document.getElementById('bg-image');
+    const frameCanvas = document.getElementById('frame-canvas');
+    const ctx = frameCanvas.getContext('2d');
+    
+    const btnFlip = document.getElementById('btnFlip');
+    const btnPhoto = document.getElementById('btnPhoto');
+    const btnVideo = document.getElementById('btnVideo');
+    const fileInput = document.getElementById('fileInput');
+    const zoomRange = document.getElementById('zoomRange');
+    
+    const previewModal = document.getElementById('previewModal');
+    const modalMediaContainer = document.getElementById('modalMediaContainer');
+    const btnClosePreview = document.getElementById('btnClosePreview');
+    const btnDownload = document.getElementById('btnDownload');
+    const recBadge = document.getElementById('recBadge');
+    const recTimer = document.getElementById('recTimer');
+
+    let currentStream = null;
+    let facingMode = 'user';
+    let frameImg = new Image();
+    let processedFrameCanvas = document.createElement('canvas');
+    let isFrameLoaded = false;
+    
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+    let recInterval = null;
+
+    // 1. CARREGAR E TORNAR O FUNDO BRANCO DA MOLDURA TRANSPARENTE AUTOMATICAMENTE
+    frameImg.onload = () => {
+      processedFrameCanvas.width = frameImg.width;
+      processedFrameCanvas.height = frameImg.height;
+      const pCtx = processedFrameCanvas.getContext('2d');
+      pCtx.drawImage(frameImg, 0, 0);
+
+      const imgData = pCtx.getImageData(0, 0, frameImg.width, frameImg.height);
+      const data = imgData.data;
+
+      // Detecta pixels brancos/claros no centro e transforma em transparente
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        if (r > 230 && g > 230 && b > 230) {
+          data[i + 3] = 0; // Transparência
+        }
+      }
+      pCtx.putImageData(imgData, 0, 0);
+      isFrameLoaded = true;
+      drawFrame();
+    };
+    
+    // Tenta carregar a imagem do repositório
+    frameImg.src = 'moldura-eloa.png';
+
+    function drawFrame() {
+      if (!isFrameLoaded) return;
+      frameCanvas.width = frameCanvas.clientWidth;
+      frameCanvas.height = frameCanvas.clientHeight;
+      ctx.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
+      ctx.drawImage(processedFrameCanvas, 0, 0, frameCanvas.width, frameCanvas.height);
+    }
+
+    window.addEventListener('resize', drawFrame);
+
+    // 2. ABRIR CÂMERA DO CELULAR
+    async function startCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: true
+        });
+        video.srcObject = currentStream;
+        bgImage.classList.add('hidden');
+        video.classList.remove('hidden');
+        
+        if (facingMode === 'user') {
+          video.classList.add('flipped');
+        } else {
+          video.classList.remove('flipped');
+        }
+      } catch (err) {
+        console.warn('Erro ao acessar a câmera:', err);
+      }
+    }
+
+    startCamera();
+
+    btnFlip.addEventListener('click', () => {
+      facingMode = (facingMode === 'user') ? 'environment' : 'user';
+      startCamera();
+    });
+
+    // ZOOM
+    zoomRange.addEventListener('input', (e) => {
+      const scale = e.target.value;
+      const flip = facingMode === 'user' && !bgImage.classList.contains('hidden') ? '' : (facingMode === 'user' ? 'scaleX(-1)' : '');
+      video.style.transform = `translate(-50%, -50%) ${flip} scale(${scale})`;
+      bgImage.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    });
+
+    // GALERIA
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const url = URL.createObjectURL(file);
+      if (file.type.startsWith('image/')) {
+        bgImage.src = url;
+        bgImage.classList.remove('hidden');
+        video.classList.add('hidden');
+      } else if (file.type.startsWith('video/')) {
+        video.src = url;
+        video.srcObject = null;
+        video.classList.remove('hidden');
+        video.classList.remove('flipped');
+        bgImage.classList.add('hidden');
+      }
+    });
+
+    // 3. CAPTURAR FOTO (COMBINA CÂMERA/FOTO + MOLDURA NO CANVAS)
+    btnPhoto.addEventListener('click', () => {
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = 720;
+      captureCanvas.height = 1280;
+      const cCtx = captureCanvas.getContext('2d');
+
+      // Desenhar Fundo (Vídeo ou Imagem)
+      if (!video.classList.contains('hidden')) {
+        cCtx.save();
+        if (facingMode === 'user' && video.srcObject) {
+          cCtx.translate(captureCanvas.width, 0);
+          cCtx.scale(-1, 1);
+        }
+        cCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+        cCtx.restore();
+      } else {
+        cCtx.drawImage(bgImage, 0, 0, captureCanvas.width, captureCanvas.height);
+      }
+
+      // Desenhar Moldura por Cima
+      if (isFrameLoaded) {
+        cCtx.drawImage(processedFrameCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
+      }
+
+      const dataUrl = captureCanvas.toDataURL('image/png');
+      modalMediaContainer.innerHTML = `<img src="${dataUrl}">`;
+      btnDownload.href = dataUrl;
+      btnDownload.download = 'foto-eloa-1-ano.png';
+      previewModal.style.display = 'flex';
+    });
+
+    // 4. GRAVAR VÍDEO (COMBINA VÍDEO + MOLDURA AO VIVO)
+    btnVideo.addEventListener('click', () => {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        stopRecording();
+      }
+    });
+
+    function startRecording() {
+      recordedChunks = [];
+      const recCanvas = document.createElement('canvas');
+      recCanvas.width = 720;
+      recCanvas.height = 1280;
+      const rCtx = recCanvas.getContext('2d');
+
+      const canvasStream = recCanvas.captureStream(30);
+
+      // Adiciona áudio da câmera, se disponível
+      if (currentStream && currentStream.getAudioTracks().length > 0) {
+        canvasStream.addTrack(currentStream.getAudioTracks()[0]);
+      }
+
+      mediaRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm' });
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const videoUrl = URL.createObjectURL(blob);
+        modalMediaContainer.innerHTML = `<video src="${videoUrl}" controls autoplay></video>`;
+        btnDownload.href = videoUrl;
+        btnDownload.download = 'video-eloa-1-ano.webm';
+        previewModal.style.display = 'flex';
+      };
+
+      // Loop de renderização no Canvas para gravar
+      let renderInterval = setInterval(() => {
+        if (!isRecording) {
+          clearInterval(renderInterval);
+          return;
+        }
+        rCtx.save();
+        if (facingMode === 'user' && video.srcObject) {
+          rCtx.translate(recCanvas.width, 0);
+          rCtx.scale(-1, 1);
+        }
+        rCtx.drawImage(video, 0, 0, recCanvas.width, recCanvas.height);
+        rCtx.restore();
+
+        if (isFrameLoaded) {
+          rCtx.drawImage(processedFrameCanvas, 0, 0, recCanvas.width, recCanvas.height);
+        }
+      }, 1000 / 30);
+
+      mediaRecorder.start();
+      isRecording = true;
+      btnVideo.textContent = '⏹️ Parar Gravação';
+      recBadge.style.display = 'flex';
+
+      let seconds = 0;
+      recInterval = setInterval(() => {
+        seconds++;
+        const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
+        const secs = String(seconds % 60).padStart(2, '0');
+        recTimer.textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function stopRecording() {
+      isRecording = false;
+      if (mediaRecorder) mediaRecorder.stop();
+      clearInterval(recInterval);
+      recBadge.style.display = 'none';
+      btnVideo.textContent = '🎥 Gravar Vídeo';
+    }
+
+    btnClosePreview.addEventListener('click', () => {
+      previewModal.style.display = 'none';
+      modalMediaContainer.innerHTML = '';
+    });
+  </script>
+</body>
+</html>
