@@ -71,6 +71,11 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
+        .btn-home:active {
+            transform: scale(0.98);
+            background-color: #e0e0e0;
+        }
+
         /* 2. TELA DA CÂMERA / MOLDURA */
         #camera-screen {
             position: absolute;
@@ -107,40 +112,7 @@
             pointer-events: none;
         }
 
-        /* Indicador de Gravação de Vídeo */
-        #rec-indicator {
-            position: absolute;
-            top: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 0, 0, 0.85);
-            color: #fff;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 14px;
-            display: none;
-            z-index: 30;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        }
-
-        .rec-dot {
-            width: 10px;
-            height: 10px;
-            background-color: #fff;
-            border-radius: 50%;
-            animation: blink 1s infinite;
-        }
-
-        @keyframes blink {
-            0% { opacity: 1; }
-            50% { opacity: 0; }
-            100% { opacity: 1; }
-        }
-
-        /* Botões Flutuantes da Câmera (Com Gravar Vídeo) */
+        /* Botões Flutuantes sobre a foto/câmera */
         .camera-controls {
             position: absolute;
             bottom: 30px;
@@ -166,25 +138,13 @@
             font-size: 22px;
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            transition: all 0.2s;
         }
 
         .circle-btn:active {
             transform: scale(0.92);
         }
 
-        .btn-recording {
-            background: #ff3b30 !important;
-            color: #fff;
-            animation: pulse 1s infinite alternate;
-        }
-
-        @keyframes pulse {
-            from { transform: scale(1); }
-            to { transform: scale(1.1); }
-        }
-
-        /* 3. TELA DE FINALIZAÇÃO (SALVAR FOTO OU VÍDEO) */
+        /* 3. TELA DE FINALIZAÇÃO */
         #result-screen {
             position: absolute;
             top: 0;
@@ -199,7 +159,7 @@
             z-index: 200;
         }
 
-        #final-image, #final-video {
+        #final-image {
             width: 100%;
             height: 100%;
             object-fit: contain;
@@ -235,7 +195,7 @@
             color: #000;
         }
 
-        #file-input {
+        #file-input, #video-input {
             display: none;
         }
     </style>
@@ -256,35 +216,32 @@
         </button>
 
         <input type="file" id="file-input" accept="image/*" onchange="carregarDaGaleria(event)">
+        <input type="file" id="video-input" accept="video/*" capture="environment" onchange="carregarDaGaleria(event)">
     </div>
 
     <!-- 2. TELA DA CÂMERA -->
     <div id="camera-screen">
-        <div id="rec-indicator"><div class="rec-dot"></div> REC <span id="rec-timer">00:00</span></div>
-
         <video id="camera-feed" autoplay playsinline muted class="mirror"></video>
         <img id="photo-preview" alt="Sua Foto" style="display:none;">
 
-        <!-- Moldura com Fundo Transparente Perfeito -->
+        <!-- Imagem da Moldura da Eloá -->
         <img id="frame-img" src="moldura.png" alt="Moldura Eloá" class="overlay-frame">
 
         <div class="camera-controls">
             <button class="circle-btn" onclick="inverterCamera()" title="Inverter Câmera">🔄</button>
             <button class="circle-btn" onclick="capturarEProcessar()" title="Tirar Foto">📸</button>
-            <button class="circle-btn" id="video-btn" onclick="toggleGravarVideo()" title="Gravar Vídeo">🎥</button>
+            <button class="circle-btn" onclick="document.getElementById('video-input').click()" title="Gravar Vídeo">🎥</button>
             <button class="circle-btn" onclick="document.getElementById('file-input').click()" title="Galeria">🖼️</button>
             <button class="circle-btn" onclick="voltarInicio()" title="Voltar">🏠</button>
         </div>
     </div>
 
-    <!-- 3. TELA DE SALVAR FOTO OU VÍDEO -->
+    <!-- 3. TELA DE SALVAR FOTO -->
     <div id="result-screen">
-        <img id="final-image" alt="Foto Final com Moldura" style="display:none;">
-        <video id="final-video" controls autoplay loop playsinline style="display:none;"></video>
-        
+        <img id="final-image" alt="Foto Final com Moldura">
         <div class="result-controls">
             <button class="btn-result btn-again" onclick="refazerFoto()">🔄 Refazer</button>
-            <a id="download-link" download="media-eloa-1-ano" class="btn-result btn-save">💾 Salvar</a>
+            <a id="download-link" download="foto-eloa-1-ano.png" class="btn-result btn-save">💾 Salvar Foto</a>
         </div>
     </div>
 
@@ -298,20 +255,11 @@
         const photoPreview = document.getElementById('photo-preview');
         const frameImg = document.getElementById('frame-img');
         const finalImage = document.getElementById('final-image');
-        const finalVideo = document.getElementById('final-video');
         const downloadLink = document.getElementById('download-link');
         const canvas = document.getElementById('canvas');
-        const videoBtn = document.getElementById('video-btn');
-        const recIndicator = document.getElementById('rec-indicator');
-        const recTimer = document.getElementById('rec-timer');
 
         let currentFacingMode = 'user'; 
         let stream = null;
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        let isRecording = false;
-        let timerInterval = null;
-        let secondsRecorded = 0;
 
         async function abrirCamera() {
             homeScreen.style.display = 'none';
@@ -332,25 +280,15 @@
                 }
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: true
+                    audio: false
                 });
                 video.srcObject = stream;
             } catch (err) {
-                // Caso o áudio seja negado, tenta abrir só com vídeo
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-                        audio: false
-                    });
-                    video.srcObject = stream;
-                } catch(e) {
-                    alert("Por favor, permita o acesso à câmera para continuar.");
-                }
+                alert("Por favor, permita o acesso à câmera no seu navegador.");
             }
         }
 
         function inverterCamera() {
-            if (isRecording) return;
             currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
             abrirCamera();
         }
@@ -375,9 +313,7 @@
             }
         }
 
-        // TIRE FOTO
         function capturarEProcessar() {
-            if (isRecording) return;
             const ctx = canvas.getContext('2d');
             
             const width = 1080;
@@ -400,19 +336,30 @@
             ctx.drawImage(frameImg, 0, 0, width, height);
 
             const dataUrl = canvas.toDataURL('image/png');
-            finalVideo.style.display = 'none';
-            finalImage.style.display = 'block';
             finalImage.src = dataUrl;
             downloadLink.href = dataUrl;
-            downloadLink.download = "foto-eloa-1-ano.png";
 
             cameraScreen.style.display = 'none';
             resultScreen.style.display = 'flex';
         }
 
-        // GRAVAR VÍDEO COM A MOLDURA
-        function toggleGravarVideo() {
-            if (!isRecording) {
-                iniciarGravação();
+        function refazerFoto() {
+            resultScreen.style.display = 'none';
+            if (video.style.display !== 'none') {
+                abrirCamera();
             } else {
-                pararGravação();
+                cameraScreen.style.display = 'block';
+            }
+        }
+
+        function voltarInicio() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            cameraScreen.style.display = 'none';
+            resultScreen.style.display = 'none';
+            homeScreen.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
