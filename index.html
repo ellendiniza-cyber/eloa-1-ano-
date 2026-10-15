@@ -21,7 +21,7 @@
             color: #fff;
         }
 
-        /* ---------------- TELA INICIAL ---------------- */
+        /* TELA INICIAL */
         #home-screen {
             position: absolute;
             top: 0;
@@ -71,12 +71,7 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
-        .btn-home:active {
-            transform: scale(0.98);
-            background-color: #e0e0e0;
-        }
-
-        /* ---------------- TELA DA CÂMERA ---------------- */
+        /* TELA DA CÂMERA */
         #camera-screen {
             position: absolute;
             top: 0;
@@ -87,8 +82,7 @@
             z-index: 1;
         }
 
-        /* Feed do vídeo com ajuste de espelhamento */
-        #camera-feed {
+        #camera-feed, #photo-preview {
             position: absolute;
             top: 0;
             left: 0;
@@ -98,17 +92,7 @@
         }
 
         .mirror {
-            transform: scaleX(-1); /* Inverte a câmera frontal para não ficar espelhada */
-        }
-
-        #photo-preview {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: none;
+            transform: scaleX(-1);
         }
 
         /* Moldura sobreposta */
@@ -118,7 +102,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: fill;
             z-index: 10;
             pointer-events: none;
         }
@@ -151,11 +135,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
 
-        .circle-btn:active {
-            transform: scale(0.92);
-        }
-
-        /* ---------------- TELA DE RESULTADO / SALVAR ---------------- */
+        /* TELA DE RESULTADO / SALVAR */
         #result-screen {
             position: absolute;
             top: 0;
@@ -191,6 +171,8 @@
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            text-decoration: none;
+            display: inline-block;
         }
 
         .btn-save {
@@ -231,7 +213,6 @@
         <video id="camera-feed" autoplay playsinline muted class="mirror"></video>
         <img id="photo-preview" alt="Sua Foto">
 
-        <!-- Imagem da Moldura da Eloá -->
         <img id="frame-img" src="moldura.png" alt="Moldura Eloá" class="overlay-frame">
 
         <div class="camera-controls">
@@ -242,14 +223,12 @@
         </div>
     </div>
 
-    <!-- 3. TELA DE FINALIZAÇÃO (SALVAR FOTO) -->
+    <!-- 3. TELA DE FINALIZAÇÃO -->
     <div id="result-screen">
         <img id="final-image" alt="Foto Final com Moldura">
         <div class="result-controls">
             <button class="btn-result btn-again" onclick="refazerFoto()">🔄 Refazer</button>
-            <a id="download-link" download="foto-eloa-1-ano.png">
-                <button class="btn-result btn-save">💾 Salvar Foto</button>
-            </a>
+            <a id="download-link" download="foto-eloa-1-ano.png" class="btn-result btn-save">💾 Salvar Foto</a>
         </div>
     </div>
 
@@ -292,7 +271,7 @@
                 });
                 video.srcObject = stream;
             } catch (err) {
-                alert("Permita o acesso à câmera nas configurações do seu navegador.");
+                alert("Por favor, permita o acesso à câmera para continuar.");
             }
         }
 
@@ -324,33 +303,39 @@
         function capturarEProcessar() {
             const ctx = canvas.getContext('2d');
             
-            // Define o tamanho final da foto com base na moldura
-            canvas.width = frameImg.naturalWidth || 1080;
-            canvas.height = frameImg.naturalHeight || 1920;
+            // Define dimensões fixas proporcionais à tela
+            const width = 1080;
+            const height = 1920;
+            canvas.width = width;
+            canvas.height = height;
 
-            // 1. Desenha a foto/vídeo no fundo
+            // 1. Desenhar a foto ou feed da câmera no fundo
             if (video.style.display !== 'none') {
                 ctx.save();
                 if (currentFacingMode === 'user') {
-                    ctx.translate(canvas.width, 0);
+                    ctx.translate(width, 0);
                     ctx.scale(-1, 1);
                 }
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(video, 0, 0, width, height);
                 ctx.restore();
             } else {
-                ctx.drawImage(photoPreview, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(photoPreview, 0, 0, width, height);
             }
 
-            // 2. Desenha a moldura por cima
-            ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+            // 2. Desenhar a moldura transparente por cima
+            ctx.drawImage(frameImg, 0, 0, width, height);
 
-            // 3. Exibe a imagem gerada para download
-            const dataUrl = canvas.toDataURL('image/png');
-            finalImage.src = dataUrl;
-            downloadLink.href = dataUrl;
+            // 3. Converter para imagem e exibir
+            try {
+                const dataUrl = canvas.toDataURL('image/png');
+                finalImage.src = dataUrl;
+                downloadLink.href = dataUrl;
 
-            cameraScreen.style.display = 'none';
-            resultScreen.style.display = 'flex';
+                cameraScreen.style.display = 'none';
+                resultScreen.style.display = 'flex';
+            } catch(e) {
+                alert("Erro ao processar a foto. Verifique se o arquivo da moldura foi enviado corretamente.");
+            }
         }
 
         function refazerFoto() {
