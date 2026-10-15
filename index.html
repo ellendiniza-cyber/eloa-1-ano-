@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moldura personalizada</title>
+    <title>Moldura personalizada - Eloá</title>
     <style>
         * {
             margin: 0;
@@ -83,11 +83,12 @@
             left: 0;
             width: 100%;
             height: 100%;
-            display: none; /* Inicia oculta */
+            display: none;
             z-index: 1;
         }
 
-        #camera-feed, #photo-preview {
+        /* Feed do vídeo com ajuste de espelhamento */
+        #camera-feed {
             position: absolute;
             top: 0;
             left: 0;
@@ -96,11 +97,21 @@
             object-fit: cover;
         }
 
+        .mirror {
+            transform: scaleX(-1); /* Inverte a câmera frontal para não ficar espelhada */
+        }
+
         #photo-preview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
             display: none;
         }
 
-        /* Moldura sobreposta com fundo transparente */
+        /* Moldura sobreposta */
         .overlay-frame {
             position: absolute;
             top: 0;
@@ -112,7 +123,7 @@
             pointer-events: none;
         }
 
-        /* Botões Flutuantes da Câmera (Estilo Imagem 2) */
+        /* Controles flutuantes */
         .camera-controls {
             position: absolute;
             bottom: 30px;
@@ -144,7 +155,54 @@
             transform: scale(0.92);
         }
 
-        /* Input para escolher arquivo da galeria */
+        /* ---------------- TELA DE RESULTADO / SALVAR ---------------- */
+        #result-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        #final-image {
+            max-width: 100%;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+
+        .result-controls {
+            position: absolute;
+            bottom: 25px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn-result {
+            padding: 14px 24px;
+            border-radius: 30px;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .btn-save {
+            background-color: #25D366;
+            color: #fff;
+        }
+
+        .btn-again {
+            background-color: #ffffff;
+            color: #000;
+        }
+
         #file-input {
             display: none;
         }
@@ -152,7 +210,7 @@
 </head>
 <body>
 
-    <!-- 1. TELA INICIAL (LAYOUT DA IMAGEM 1) -->
+    <!-- 1. TELA INICIAL -->
     <div id="home-screen">
         <h1>Moldura personalizada</h1>
         <p>Tire uma foto agora ou escolha uma foto que já está no celular.</p>
@@ -168,43 +226,61 @@
         <input type="file" id="file-input" accept="image/*" onchange="carregarDaGaleria(event)">
     </div>
 
-    <!-- 2. TELA DO FILTRO / CÂMERA (LAYOUT DA IMAGEM 2) -->
+    <!-- 2. TELA DA CÂMERA -->
     <div id="camera-screen">
-        <!-- Feed de Vídeo -->
-        <video id="camera-feed" autoplay playsinline muted></video>
-        
-        <!-- Foto da Galeria (se escolhida) -->
+        <video id="camera-feed" autoplay playsinline muted class="mirror"></video>
         <img id="photo-preview" alt="Sua Foto">
 
-        <!-- Moldura com Fundo Transparente da Eloá -->
-        <img src="moldura.png" alt="Moldura Eloá" class="overlay-frame">
+        <!-- Imagem da Moldura da Eloá -->
+        <img id="frame-img" src="moldura.png" alt="Moldura Eloá" class="overlay-frame">
 
-        <!-- Botões Redondos sobre a imagem -->
         <div class="camera-controls">
             <button class="circle-btn" onclick="inverterCamera()" title="Inverter Câmera">🔄</button>
-            <button class="circle-btn" onclick="tirarFoto()" title="Tirar Foto">📸</button>
+            <button class="circle-btn" onclick="capturarEProcessar()" title="Tirar Foto">📸</button>
             <button class="circle-btn" onclick="document.getElementById('file-input').click()" title="Galeria">🖼️</button>
             <button class="circle-btn" onclick="voltarInicio()" title="Voltar">🏠</button>
         </div>
     </div>
 
-    <!-- Elemento Canvas invisível para captura da foto final -->
-    <canvas id="capture-canvas" style="display:none;"></canvas>
+    <!-- 3. TELA DE FINALIZAÇÃO (SALVAR FOTO) -->
+    <div id="result-screen">
+        <img id="final-image" alt="Foto Final com Moldura">
+        <div class="result-controls">
+            <button class="btn-result btn-again" onclick="refazerFoto()">🔄 Refazer</button>
+            <a id="download-link" download="foto-eloa-1-ano.png">
+                <button class="btn-result btn-save">💾 Salvar Foto</button>
+            </a>
+        </div>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
         const homeScreen = document.getElementById('home-screen');
         const cameraScreen = document.getElementById('camera-screen');
+        const resultScreen = document.getElementById('result-screen');
         const video = document.getElementById('camera-feed');
         const photoPreview = document.getElementById('photo-preview');
-        let currentFacingMode = 'user'; // 'user' para frontal, 'environment' para traseira
+        const frameImg = document.getElementById('frame-img');
+        const finalImage = document.getElementById('final-image');
+        const downloadLink = document.getElementById('download-link');
+        const canvas = document.getElementById('canvas');
+
+        let currentFacingMode = 'user'; 
         let stream = null;
 
-        // Abrir Câmera ao clicar no botão
         async function abrirCamera() {
             homeScreen.style.display = 'none';
+            resultScreen.style.display = 'none';
             cameraScreen.style.display = 'block';
             photoPreview.style.display = 'none';
             video.style.display = 'block';
+
+            if (currentFacingMode === 'user') {
+                video.classList.add('mirror');
+            } else {
+                video.classList.remove('mirror');
+            }
 
             try {
                 if (stream) {
@@ -216,17 +292,15 @@
                 });
                 video.srcObject = stream;
             } catch (err) {
-                alert("Não foi possível acessar a câmera. Verifique as permissões do seu navegador.");
+                alert("Permita o acesso à câmera nas configurações do seu navegador.");
             }
         }
 
-        // Inverter entre Câmera Frontal e Traseira
         function inverterCamera() {
             currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
             abrirCamera();
         }
 
-        // Carregar Foto escolhida da Galeria
         function carregarDaGaleria(event) {
             const file = event.target.files[0];
             if (file) {
@@ -240,27 +314,61 @@
                     photoPreview.style.display = 'block';
                     
                     homeScreen.style.display = 'none';
+                    resultScreen.style.display = 'none';
                     cameraScreen.style.display = 'block';
                 }
                 reader.readAsDataURL(file);
             }
         }
 
-        // Voltar para a Tela Inicial
+        function capturarEProcessar() {
+            const ctx = canvas.getContext('2d');
+            
+            // Define o tamanho final da foto com base na moldura
+            canvas.width = frameImg.naturalWidth || 1080;
+            canvas.height = frameImg.naturalHeight || 1920;
+
+            // 1. Desenha a foto/vídeo no fundo
+            if (video.style.display !== 'none') {
+                ctx.save();
+                if (currentFacingMode === 'user') {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            } else {
+                ctx.drawImage(photoPreview, 0, 0, canvas.width, canvas.height);
+            }
+
+            // 2. Desenha a moldura por cima
+            ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+
+            // 3. Exibe a imagem gerada para download
+            const dataUrl = canvas.toDataURL('image/png');
+            finalImage.src = dataUrl;
+            downloadLink.href = dataUrl;
+
+            cameraScreen.style.display = 'none';
+            resultScreen.style.display = 'flex';
+        }
+
+        function refazerFoto() {
+            resultScreen.style.display = 'none';
+            if (video.style.display !== 'none') {
+                abrirCamera();
+            } else {
+                cameraScreen.style.display = 'block';
+            }
+        }
+
         function voltarInicio() {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
             cameraScreen.style.display = 'none';
+            resultScreen.style.display = 'none';
             homeScreen.style.display = 'flex';
-        }
-
-        // Tirar Foto (Gera Flash Rápido)
-        function tirarFoto() {
-            document.body.style.opacity = '0.3';
-            setTimeout(() => {
-                document.body.style.opacity = '1';
-            }, 100);
         }
     </script>
 </body>
